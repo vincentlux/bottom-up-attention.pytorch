@@ -3,8 +3,8 @@ import numpy as np
 import cv2
 import os
 
-from models.bua.layers.nms import nms
-from models.bua.box_regression import BUABoxes
+from frcnn_ext_models.bua.layers.nms import nms
+from frcnn_ext_models.bua.box_regression import BUABoxes
 
 PIXEL_MEANS = np.array([[[102.9801, 115.9465, 122.7717]]])
 TEST_SCALES = (600,)

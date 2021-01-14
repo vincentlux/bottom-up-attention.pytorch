@@ -31,6 +31,16 @@ Some example object and attribute predictions for salient image regions are illu
 
 Note that most of the requirements above are needed for Detectron2. 
 
+
+#### Quick Installation
+```
+pip install -r requirements.txt
+python setup.py build develop
+
+```
+
+
+
 #### Installation
 
 1. Clone the project including the required version (v0.2.1) of Detectron2

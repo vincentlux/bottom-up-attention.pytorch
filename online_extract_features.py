@@ -16,8 +16,8 @@ from detectron2.evaluation import COCOEvaluator, verify_results
 from detectron2.structures import Instances
 
 # from utils.progress_bar import ProgressBar
-from models import add_config
-from models.bua.layers.nms import nms
+from frcnn_ext_models import add_config
+from frcnn_ext_models.bua.layers.nms import nms
 
 from tqdm import tqdm
 from typing import List

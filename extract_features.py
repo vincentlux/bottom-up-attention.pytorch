@@ -26,7 +26,7 @@ from utils.utils import mkdir, save_features
 from utils.extract_utils import get_image_blob, save_bbox, save_roi_features_by_bbox, save_roi_features
 from utils.progress_bar import ProgressBar
 from models import add_config
-from models.bua.box_regression import BUABoxes
+from frcnn_ext_models.bua.box_regression import BUABoxes
 
 import ray
 from ray.actor import ActorHandle

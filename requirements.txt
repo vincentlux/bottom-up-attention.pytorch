@@ -1,0 +1,4 @@
+torch>=1.6.0
+opencv-python==4.5.1.48
+git+git://github.com/NVIDIA/apex
+git+git://github.com/facebookresearch/detectron2.git@be792b959bca9af0aacfa04799537856c7a92802
