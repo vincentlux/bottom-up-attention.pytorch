@@ -23,7 +23,7 @@ from detectron2.evaluation import COCOEvaluator, verify_results
 from detectron2.structures import Instances
 
 from utils.utils import mkdir, save_features
-from utils.extract_utils import get_image_blob, save_bbox, save_roi_features_by_bbox, save_roi_features
+from utils.extract_utils import get_image_blob, save_bbox, save_roi_features_by_bbox, save_roi_features, get_grid_bbox
 from utils.progress_bar import ProgressBar
 from frcnn_ext_models import add_config
 from frcnn_ext_models.bua.box_regression import BUABoxes
@@ -52,7 +52,7 @@ def set_min_max_boxes(min_max_boxes):
     except:
         print('Illegal min-max boxes setting, using config default. ')
         return []
-    cmd = ['MODEL.BUA.EXTRACTOR.MIN_BOXES', min_boxes, 
+    cmd = ['MODEL.BUA.EXTRACTOR.MIN_BOXES', min_boxes,
             'MODEL.BUA.EXTRACTOR.MAX_BOXES', max_boxes]
     return cmd
 
@@ -117,8 +117,8 @@ def extract_feat(split_idx, img_list, cfg, args, actor: ActorHandle):
             features_pooled = [feat.cpu() for feat in features_pooled]
             if not attr_scores is None:
                 attr_scores = [attr_score.cpu() for attr_score in attr_scores]
-            generate_npz_list.append(generate_npz.remote(1, actor, 
-                args, cfg, im_file, im, dataset_dict, 
+            generate_npz_list.append(generate_npz.remote(1, actor,
+                args, cfg, im_file, im, dataset_dict,
                 boxes, scores, features_pooled, attr_scores))
         # extract bbox only
         elif cfg.MODEL.BUA.EXTRACTOR.MODE == 2:
@@ -126,15 +126,19 @@ def extract_feat(split_idx, img_list, cfg, args, actor: ActorHandle):
                 boxes, scores = model([dataset_dict])
             boxes = [box.cpu() for box in boxes]
             scores = [score.cpu() for score in scores]
-            generate_npz_list.append(generate_npz.remote(2, actor, 
-                args, cfg, im_file, im, dataset_dict, 
+            generate_npz_list.append(generate_npz.remote(2, actor,
+                args, cfg, im_file, im, dataset_dict,
                 boxes, scores))
         # extract roi features by bbox
         elif cfg.MODEL.BUA.EXTRACTOR.MODE == 3:
             if not os.path.exists(os.path.join(args.bbox_dir, im_file.split('.')[0]+'.npz')):
-                actor.update.remote(1)
-                continue
-            bbox = torch.from_numpy(np.load(os.path.join(args.bbox_dir, im_file.split('.')[0]+'.npz'))['bbox']) * dataset_dict['im_scale']
+                # if not presenting bbox dir, default to extract grid features
+                H = np.size(im, 0)
+                W = np.size(im, 1)
+                bbox = get_grid_bbox(grid_size=args.grid_size, image_size=(H, W))
+                bbox = torch.from_numpy(bbox.reshape(args.grid_size**2, 4)) * dataset_dict['im_scale']
+            else:
+                bbox = torch.from_numpy(np.load(os.path.join(args.bbox_dir, im_file.split('.')[0]+'.npz'))['bbox']) * dataset_dict['im_scale']
             proposals = Instances(dataset_dict['image'].shape[-2:])
             proposals.proposal_boxes = BUABoxes(bbox)
             dataset_dict['proposals'] = proposals
@@ -150,8 +154,8 @@ def extract_feat(split_idx, img_list, cfg, args, actor: ActorHandle):
             features_pooled = [feat.cpu() for feat in features_pooled]
             if not attr_scores is None:
                 attr_scores = [attr_score.data.cpu() for attr_score in attr_scores]
-            generate_npz_list.append(generate_npz.remote(3, actor, 
-                args, cfg, im_file, im, dataset_dict, 
+            generate_npz_list.append(generate_npz.remote(3, actor,
+                args, cfg, im_file, im, dataset_dict,
                 boxes, scores, features_pooled, attr_scores))
 
     ray.get(generate_npz_list)
@@ -166,7 +170,7 @@ def main():
         help="path to config file",
     )
 
-    parser.add_argument('--num-cpus', default=1, type=int, 
+    parser.add_argument('--num-cpus', default=1, type=int,
                         help='number of cpus to use for ray, 0 means no limit')
 
     parser.add_argument('--gpus', dest='gpu_id', help='GPU id(s) to use',
@@ -179,7 +183,7 @@ def main():
                         'extract roi features directly', 'extract bboxes only' and \
                         'extract roi features with pre-computed bboxes' respectively")
 
-    parser.add_argument('--min-max-boxes', default='min_max_default', type=str, 
+    parser.add_argument('--min-max-boxes', default='min_max_default', type=str,
                         help='the number of min-max boxes of extractor')
 
     parser.add_argument('--out-dir', dest='output_dir',
@@ -191,6 +195,7 @@ def main():
     parser.add_argument('--bbox-dir', dest='bbox_dir',
                         help='directory with bbox',
                         default="bbox")
+    parser.add_argument('--grid_size', default=8, type=int)
     parser.add_argument(
         "--resume",
         action="store_true",
@@ -215,10 +220,12 @@ def main():
     CONF_THRESH = cfg.MODEL.BUA.EXTRACTOR.CONF_THRESH
 
     # Extract features.
-    imglist = os.listdir(args.image_dir)
+    # imglist = os.listdir(args.image_dir)
+    imglist = [os.path.join(dp, f) for dp, dn, fn in os.walk(args.image_dir) for f in fn]
+    imglist = [i.replace(f'{args.image_dir}/', '') for i in imglist]
+
     num_images = len(imglist)
     print('Number of images: {}.'.format(num_images))
-
     if args.num_cpus != 0:
         ray.init(num_cpus=args.num_cpus)
     else:
@@ -232,7 +239,7 @@ def main():
     extract_feat_list = []
     for i in range(num_gpus):
         extract_feat_list.append(extract_feat.remote(i, img_lists[i], cfg, args, actor))
-    
+
     pb.print_until_done()
     ray.get(extract_feat_list)
     ray.get(actor.get_counter.remote())

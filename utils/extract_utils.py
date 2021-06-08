@@ -25,6 +25,22 @@ def im_list_to_blob(ims):
 
     return blob
 
+def get_grid_bbox(grid_size=8, image_size=(448,448)):
+    H, W = image_size
+    grid_h = H // grid_size
+    grid_w = W // grid_size
+
+    bbox = np.zeros(shape=(grid_size, grid_size, 4), dtype=np.float32)
+
+    for i in range(grid_size):
+        for j in range(grid_size):
+            # pre-normalize (0 ~ 1)
+            x0, x1 = j * grid_w, (j + 1) * grid_w
+            y0, y1 = i * grid_h, (i + 1) * grid_h
+            coordinate = (x0, y0, x1, y1)
+            bbox[i, j] = coordinate
+    return bbox
+
 def get_image_blob(im, pixel_means):
     """Converts an image into a network input.
     Arguments:
@@ -61,7 +77,7 @@ def save_roi_features(args, cfg, im_file, im, dataset_dict, boxes, scores, featu
     MIN_BOXES = cfg.MODEL.BUA.EXTRACTOR.MIN_BOXES
     MAX_BOXES = cfg.MODEL.BUA.EXTRACTOR.MAX_BOXES
     CONF_THRESH = cfg.MODEL.BUA.EXTRACTOR.CONF_THRESH
-  
+
     dets = boxes[0] / dataset_dict['im_scale']
     scores = scores[0]
     feats = features_pooled[0]
@@ -73,7 +89,7 @@ def save_roi_features(args, cfg, im_file, im, dataset_dict, boxes, scores, featu
             max_conf[keep] = torch.where(cls_scores[keep] > max_conf[keep],
                                              cls_scores[keep],
                                              max_conf[keep])
-            
+
     keep_boxes = torch.nonzero(max_conf >= CONF_THRESH).flatten()
     if len(keep_boxes) < MIN_BOXES:
         keep_boxes = torch.argsort(max_conf, descending=True)[:MIN_BOXES]
@@ -108,6 +124,7 @@ def save_roi_features(args, cfg, im_file, im, dataset_dict, boxes, scores, featu
             }
 
     output_file = os.path.join(args.output_dir, im_file.split('.')[0])
+    os.makedirs(output_file.rsplit('/', 1)[0], exist_ok=True)
     np.savez_compressed(output_file, x=image_feat, bbox=image_bboxes, num_bbox=len(keep_boxes), image_h=np.size(im, 0), image_w=np.size(im, 1), info=info)
 
 def save_bbox(args, cfg, im_file, im, dataset_dict, boxes, scores):
@@ -134,7 +151,7 @@ def save_bbox(args, cfg, im_file, im, dataset_dict, boxes, scores):
             max_conf[keep] = torch.where(cls_scores[keep] > max_conf[keep],
                                              cls_scores[keep],
                                              max_conf[keep])
-            
+
     keep_boxes = torch.argsort(max_conf, descending=True)[:MAX_BOXES]
     image_bboxes = cls_boxes[keep_boxes]
 
@@ -179,4 +196,4 @@ def save_roi_features_by_bbox(args, cfg, im_file, im, dataset_dict, boxes, score
             }
 
     output_file = os.path.join(args.output_dir, im_file.split('.')[0])
-    np.savez_compressed(output_file, x=image_feat, bbox=image_bboxes, num_bbox=len(keep_boxes), image_h=np.size(im, 0), image_w=np.size(im, 1), info=info) 
+    np.savez_compressed(output_file, x=image_feat, bbox=image_bboxes, num_bbox=len(keep_boxes), image_h=np.size(im, 0), image_w=np.size(im, 1), info=info)

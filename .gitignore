@@ -1,4 +1,9 @@
+*.pyc
+
+__pycache__/
 *.egg-info/
 .vscode/
 build/
 output/
+resources/
+train_images

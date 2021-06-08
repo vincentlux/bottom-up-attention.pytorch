@@ -25,7 +25,7 @@ from detectron2.structures import Instances
 from utils.utils import mkdir, save_features
 from utils.extract_utils import get_image_blob, save_bbox, save_roi_features_by_bbox, save_roi_features
 from utils.progress_bar import ProgressBar
-from models import add_config
+from frcnn_ext_models import add_config
 from frcnn_ext_models.bua.box_regression import BUABoxes
 
 import ray
@@ -52,7 +52,7 @@ def set_min_max_boxes(min_max_boxes):
     except:
         print('Illegal min-max boxes setting, using config default. ')
         return []
-    cmd = ['MODEL.BUA.EXTRACTOR.MIN_BOXES', min_boxes, 
+    cmd = ['MODEL.BUA.EXTRACTOR.MIN_BOXES', min_boxes,
             'MODEL.BUA.EXTRACTOR.MAX_BOXES', max_boxes]
     return cmd
 
@@ -114,8 +114,8 @@ def extract_feat(split_idx, img_list, cfg, args, actor: ActorHandle):
             features_pooled = [feat.cpu() for feat in features_pooled]
             if not attr_scores is None:
                 attr_scores = [attr_score.cpu() for attr_score in attr_scores]
-            generate_npz(1, 
-                args, cfg, im_file, im, dataset_dict, 
+            generate_npz(1,
+                args, cfg, im_file, im, dataset_dict,
                 boxes, scores, features_pooled, attr_scores)
         # extract bbox only
         elif cfg.MODEL.BUA.EXTRACTOR.MODE == 2:
@@ -124,7 +124,7 @@ def extract_feat(split_idx, img_list, cfg, args, actor: ActorHandle):
             boxes = [box.cpu() for box in boxes]
             scores = [score.cpu() for score in scores]
             generate_npz(2,
-                args, cfg, im_file, im, dataset_dict, 
+                args, cfg, im_file, im, dataset_dict,
                 boxes, scores)
         # extract roi features by bbox
         elif cfg.MODEL.BUA.EXTRACTOR.MODE == 3:
@@ -147,8 +147,8 @@ def extract_feat(split_idx, img_list, cfg, args, actor: ActorHandle):
             features_pooled = [feat.cpu() for feat in features_pooled]
             if not attr_scores is None:
                 attr_scores = [attr_score.data.cpu() for attr_score in attr_scores]
-            generate_npz(3, 
-                args, cfg, im_file, im, dataset_dict, 
+            generate_npz(3,
+                args, cfg, im_file, im, dataset_dict,
                 boxes, scores, features_pooled, attr_scores)
 
         actor.update.remote(1)
@@ -163,7 +163,7 @@ def main():
         help="path to config file",
     )
 
-    parser.add_argument('--num-cpus', default=1, type=int, 
+    parser.add_argument('--num-cpus', default=1, type=int,
                         help='number of cpus to use for ray, 0 means no limit')
 
     parser.add_argument('--gpus', dest='gpu_id', help='GPU id(s) to use',
@@ -176,7 +176,7 @@ def main():
                         'extract roi features directly', 'extract bboxes only' and \
                         'extract roi features with pre-computed bboxes' respectively")
 
-    parser.add_argument('--min-max-boxes', default='min_max_default', type=str, 
+    parser.add_argument('--min-max-boxes', default='min_max_default', type=str,
                         help='the number of min-max boxes of extractor')
 
     parser.add_argument('--out-dir', dest='output_dir',
@@ -229,7 +229,7 @@ def main():
     extract_feat_list = []
     for i in range(num_gpus):
         extract_feat_list.append(extract_feat.remote(i, img_lists[i], cfg, args, actor))
-    
+
     pb.print_until_done()
     ray.get(extract_feat_list)
     ray.get(actor.get_counter.remote())

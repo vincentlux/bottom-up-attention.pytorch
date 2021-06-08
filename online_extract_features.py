@@ -79,7 +79,7 @@ def set_min_max_boxes(min_max_boxes):
     except:
         print('Illegal min-max boxes setting, using config default. ')
         return []
-    cmd = ['MODEL.BUA.EXTRACTOR.MIN_BOXES', min_boxes, 
+    cmd = ['MODEL.BUA.EXTRACTOR.MIN_BOXES', min_boxes,
             'MODEL.BUA.EXTRACTOR.MAX_BOXES', max_boxes]
     return cmd
 
@@ -131,7 +131,7 @@ def get_image_blob(im, pixel_means):
 def normalize_box_feats(boxes, im_h, im_w):
     '''
     input: 10 * 1d array of len 4 (xmin, ymin, xmax, ymax); img height; img width
-    output: np array with shape (num_boxes, 8) 
+    output: np array with shape (num_boxes, 8)
     8: (xmin, ymin, xmax, ymax, xcent, ycent, wbox, hbox) normalized to -1,1
     '''
     # print(f'img width:{im_w} img height:{im_h}')
@@ -175,7 +175,7 @@ class FRCNNExtractor(object):
         MIN_BOXES = cfg.MODEL.BUA.EXTRACTOR.MIN_BOXES
         MAX_BOXES = cfg.MODEL.BUA.EXTRACTOR.MAX_BOXES
         CONF_THRESH = cfg.MODEL.BUA.EXTRACTOR.CONF_THRESH
-    
+
         dets = boxes[0] / dataset_dict['im_scale']
         scores = scores[0]
         feats = features_pooled[0]
@@ -187,7 +187,7 @@ class FRCNNExtractor(object):
                 max_conf[keep] = torch.where(cls_scores[keep] > max_conf[keep],
                                                 cls_scores[keep],
                                                 max_conf[keep])
-                
+
         keep_boxes = torch.nonzero(max_conf >= CONF_THRESH).flatten()
         if len(keep_boxes) < MIN_BOXES:
             keep_boxes = torch.argsort(max_conf, descending=True)[:MIN_BOXES]
@@ -203,7 +203,7 @@ class FRCNNExtractor(object):
         loc_feat = normalize_box_feats(image_bboxes.numpy(), image_h, image_w)
         feat = np.concatenate((image_feat.numpy(), loc_feat), axis=1)
 
-        
+
         objects = ' '.join([self.vg_objects[i] for i in image_objects])
 
         info = {
@@ -217,7 +217,7 @@ class FRCNNExtractor(object):
         if batch_size > 1:
             raise NotImplementedError
         img_feat_list = []
-        
+
         for img in tqdm(imgs):
             # im = cv2.imread(im_file)
             dataset_dict = get_image_blob(img, self.cfg.MODEL.PIXEL_MEAN)
@@ -234,8 +234,8 @@ class FRCNNExtractor(object):
                 features_pooled = [feat.cpu() for feat in features_pooled]
                 if attr_scores is not None:
                     attr_scores = [attr_score.cpu() for attr_score in attr_scores]
-                
-                img_feat = self.post_process(self.cfg, img, dataset_dict, 
+
+                img_feat = self.post_process(self.cfg, img, dataset_dict,
                     boxes, scores, features_pooled, attr_scores)
                 img_feat_list.append(img_feat)
 
@@ -246,7 +246,7 @@ class FRCNNExtractor(object):
 if __name__ == "__main__":
     extractor = FRCNNExtractor('configs/bua-caffe/extract-bua-caffe-r101.yaml')
     # img_dir = '/home/vincent/proj/soco/soco/soco-image-sparta/data/coco/train2014'
-    img_dir = './datasets/demo/debug'
+    img_dir = './datasets/demo'
     img_path_list = os.listdir(img_dir)
     budget = 10
     imgs = []
@@ -254,5 +254,5 @@ if __name__ == "__main__":
         imgs.append(cv2.imread(os.path.join(img_dir, img)))
         if i == budget:
             break
-    
+
     results = extractor.batch_extract_feat(imgs)
