@@ -13,12 +13,16 @@ DATA_INFO_MAP = {
     "msrvtt": {
         "in_dir": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/Video-frames-hdbscan",
         "out_dir": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/features/{}_frcnn.lmdb",
-        "meta":{
-                "data": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_data.json",
-                "train9k": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_train.9k.csv",
-                "train7k": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_train.7k.csv",
-                "test": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_JSFUSION_test.csv"
-            }
+        "ids": {
+            "train9k": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_train.9k.csv",
+            "train7k": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_train.7k.csv",
+            "test": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_JSFUSION_test.csv"
+            },
+        "captions": {
+            "train9k": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_data.json",
+            "train7k": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_data.json",
+            "test": "/mnt/data1/vincent/proj/soco/trec/data/msrvtt/raw/MSRVTT_JSFUSION_test.csv"
+        }
     }
 }
 
@@ -41,18 +45,25 @@ def get_vid_ids_from_file(data_name, path):
     else:
         raise NotImplementedError
 
+
 def get_vid_id_caption_map_from_file(data_name, path):
+    img_id_caption_map = defaultdict(list)
     if data_name == "msrvtt":
-        data = json.load(open(path))["sentences"]
-        img_id_caption_map = defaultdict(list)
-        for d in data:
-            img_id_caption_map[d["video_id"]].append(d["caption"])
-        return img_id_caption_map
+        if path.endswith("json"):
+            data = json.load(open(path))["sentences"]
+            for d in data:
+                img_id_caption_map[d["video_id"]].append(d["caption"])
+        elif path.endswith("csv"):
+            data = pd.read_csv(path)
+            for vid, sent in zip(data["video_id"].values, data["sentence"].values):
+                img_id_caption_map[vid].append(sent)
+
+    return img_id_caption_map
 
 
 if __name__ == "__main__":
     # set the data needed to extract
-    data_splits = {"msrvtt": ["train9k", "train7k"]}
+    data_splits = {"msrvtt": ["test"]}
 
     extractor = FRCNNExtractor("resources/frcnn-bua-caffe-r101-with-attrs")
 
@@ -67,8 +78,8 @@ if __name__ == "__main__":
             img_path_list = os.listdir(vid_dir)
 
             # filter keys and captions by split
-            vid_ids_needed = get_vid_ids_from_file(data_name, DATA_INFO_MAP[data_name]["meta"][split])
-            captions = get_vid_id_caption_map_from_file(data_name, DATA_INFO_MAP[data_name]["meta"]["data"])
+            vid_ids_needed = get_vid_ids_from_file(data_name, DATA_INFO_MAP[data_name]["ids"][split])
+            captions = get_vid_id_caption_map_from_file(data_name, DATA_INFO_MAP[data_name]["captions"][split])
             vid_path_needed = [_ for _ in img_path_list if _ in vid_ids_needed]
             captions_needed = {_k: _v for _k, _v in captions.items() if _k in vid_ids_needed}
             print("get {}/{} needed video paths".format(vid_path_needed, img_path_list))
